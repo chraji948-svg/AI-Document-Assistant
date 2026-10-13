@@ -87,6 +87,7 @@ USER QUESTION:
 {question}
 """
 
+                    
                     try:
                         with st.spinner("AI is reading your document..."):
                             client = genai.Client(api_key=api_key)
@@ -99,13 +100,8 @@ USER QUESTION:
                             st.subheader("Answer")
                             st.write(response.text)
                         else:
-                            st.warning(
-                                "The AI returned an empty answer. "
-                                "Please try again."
-                            )
-                            except Exception as e:
-                                st.error("AI request failed.")
-                                st.code(f"{type(e).__name__}: {e}")
+                            st.warning("The AI returned an empty answer.")
 
-    except Exception as e:
-        st.error(f"Could not read the document: {e}")
+                    except Exception as e:
+                        st.error("AI request failed.")
+                        st.code(f"{type(e).__name__}: {e}")

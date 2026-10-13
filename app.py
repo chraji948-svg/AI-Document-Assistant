@@ -218,14 +218,13 @@ USER QUESTION:
                             model="gemini-3.5-flash-lite",
                             contents=question_prompt
                         )
-                        
-if response.text:
-    answer = response.text
+                        if response.text:
+                            answer = response.text
 
     # Save question and answer
-    st.session_state.chat_history.append({
-        "question": question,
-        "answer": answer
+        st.session_state.chat_history.append({
+            "question": question,
+            "answer": answer
     })
 
     st.subheader(labels["answer"])

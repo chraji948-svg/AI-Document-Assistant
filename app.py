@@ -16,6 +16,10 @@ st.write(
     "and ask questions in your preferred language."
 )
 
+# Initialize chat history
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
 # Read API key securely from Streamlit Secrets
 try:
     api_key = st.secrets.get("GEMINI_API_KEY", "")
@@ -214,12 +218,20 @@ USER QUESTION:
                             model="gemini-3.5-flash-lite",
                             contents=question_prompt
                         )
+                        
+if response.text:
+    answer = response.text
 
-                    if response.text:
-                        st.subheader(labels["answer"])
-                        st.markdown(response.text)
-                    else:
-                        st.warning("The AI returned an empty answer.")
+    # Save question and answer
+    st.session_state.chat_history.append({
+        "question": question,
+        "answer": answer
+    })
+
+    st.subheader(labels["answer"])
+    st.markdown(answer)
+else:
+    st.warning("The AI returned an empty answer.")
 
                 except Exception as e:
                     st.error("AI request failed.")
@@ -228,3 +240,21 @@ USER QUESTION:
     except Exception as e:
         st.error("Could not read the document.")
         st.code(f"{type(e).__name__}: {e}")
+
+# Display chat history
+st.divider()
+st.subheader("📚 Chat History")
+
+if st.session_state.chat_history:
+    for i, chat in enumerate(
+        st.session_state.chat_history, start=1
+    ):
+        with st.expander(f"Question {i}: {chat['question']}"):
+            st.markdown("**Answer:**")
+            st.write(chat["answer"])
+
+    if st.button("Clear Chat History"):
+        st.session_state.chat_history = []
+        st.rerun()
+else:
+    st.info("మీరు ఇంకా ప్రశ్నలు అడగలేదు. / No questions asked yet.")

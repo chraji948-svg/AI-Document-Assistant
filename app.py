@@ -3,6 +3,7 @@ import streamlit as st
 from pypdf import PdfReader
 from io import BytesIO
 from google import genai
+import hashlib
 
 st.set_page_config(
     page_title="AI Document Assistant",
@@ -12,7 +13,7 @@ st.set_page_config(
 
 st.title("📄 AI Document Assistant")
 st.write(
-    "Upload a document, generate a summary, "
+    "Upload documents, generate summaries, "
     "and ask questions in your preferred language."
 )
 
@@ -41,8 +42,8 @@ language = st.selectbox(
 
 if language == "తెలుగు":
     labels = {
-        "upload": "మీ PDF లేదా TXT document upload చేయండి",
-        "success": "Document విజయవంతంగా upload అయింది!",
+        "upload": "మీ PDF లేదా TXT documents upload చేయండి",
+        "success": "Documents విజయవంతంగా చదవబడ్డాయి!",
         "preview": "Document Preview",
         "summary": "📝 Document Summary",
         "length": "Summary రకం ఎంచుకోండి",
@@ -54,10 +55,7 @@ if language == "తెలుగు":
         "ask": "AIని అడగండి",
         "answer": "🤖 AI సమాధానం",
         "empty": "దయచేసి ప్రశ్న టైప్ చేయండి.",
-        "no_text": (
-            "ఈ document‌లో చదవగల text కనిపించలేదు. "
-            "Scanned PDF కావచ్చు."
-        ),
+        "no_text": "చదవగల text ఏ document‌లోనూ కనిపించలేదు.",
         "working_summary": "Summary తయారవుతోంది...",
         "working_answer": "AI సమాధానం సిద్ధం చేస్తోంది...",
         "download": "Summary Download చేయండి",
@@ -73,8 +71,8 @@ if language == "తెలుగు":
     output_language = "Telugu"
 else:
     labels = {
-        "upload": "Upload your PDF or TXT document",
-        "success": "Document uploaded successfully!",
+        "upload": "Upload your PDF or TXT documents",
+        "success": "Documents read successfully!",
         "preview": "Document Preview",
         "summary": "📝 Document Summary",
         "length": "Choose summary style",
@@ -86,10 +84,7 @@ else:
         "ask": "Ask AI",
         "answer": "🤖 AI Answer",
         "empty": "Please enter a question.",
-        "no_text": (
-            "No readable text found. "
-            "This may be a scanned PDF."
-        ),
+        "no_text": "No readable text was found in the documents.",
         "working_summary": "Generating summary...",
         "working_answer": "Preparing AI answer...",
         "download": "Download Summary",
@@ -100,55 +95,87 @@ else:
         "empty_answer": "The AI returned an empty answer.",
         "summary_error": "Could not generate summary.",
         "answer_error": "AI request failed.",
-        "read_error": "Could not read the document."
+        "read_error": "Could not read the documents."
     }
     output_language = "English"
 
-# Upload document
+# Upload multiple documents
 uploaded_files = st.file_uploader(
     labels["upload"],
     type=["pdf", "txt"],
     accept_multiple_files=True
 )
 
-if uploaded_file is not None:
-    try:
-        # Extract text from PDF or TXT
-        if uploaded_file.name.lower().endswith(".pdf"):
-            reader = PdfReader(
-                BytesIO(uploaded_file.getvalue())
-            )
-            text = "\n".join(
-                page.extract_text() or ""
-                for page in reader.pages
-            )
-        else:
-            text = uploaded_file.getvalue().decode(
-                "utf-8",
-                errors="replace"
+if uploaded_files:
+    extracted_documents = []
+    document_names = []
+
+    # Read every uploaded file
+    for uploaded_file in uploaded_files:
+        try:
+            if uploaded_file.name.lower().endswith(".pdf"):
+                reader = PdfReader(
+                    BytesIO(uploaded_file.getvalue())
+                )
+                file_text = "\n".join(
+                    page.extract_text() or ""
+                    for page in reader.pages
+                )
+            else:
+                file_text = uploaded_file.getvalue().decode(
+                    "utf-8",
+                    errors="replace"
+                )
+
+            if file_text.strip():
+                extracted_documents.append(
+                    f"DOCUMENT NAME: {uploaded_file.name}\n"
+                    f"DOCUMENT CONTENT:\n{file_text}"
+                )
+                document_names.append(uploaded_file.name)
+            else:
+                st.warning(
+                    f"No readable text found in "
+                    f"{uploaded_file.name}."
+                )
+
+        except Exception as e:
+            st.error(
+                f"Could not read {uploaded_file.name}: "
+                f"{type(e).__name__}: {e}"
             )
 
-        if not text.strip():
-            st.warning(labels["no_text"])
-            st.stop()
-
+    if extracted_documents:
         st.success(labels["success"])
+
+        # Combine document text for AI
+        all_text = "\n\n--- NEXT DOCUMENT ---\n\n".join(
+            extracted_documents
+        )
+
+        # Limit total text sent to AI
+        document_text = all_text[:30000]
+
+        # Create a unique key for these documents and language
+        identity = "|".join(document_names) + "|" + language
+        file_hash = hashlib.md5(
+            (identity + document_text).encode("utf-8")
+        ).hexdigest()
+
+        summary_key = f"summary_{file_hash}"
 
         # Document preview
         with st.expander(labels["preview"]):
+            st.caption(
+                "Uploaded documents: "
+                + ", ".join(document_names)
+            )
             st.text_area(
                 "Extracted text",
-                text,
-                height=250
+                document_text,
+                height=250,
+                key=f"preview_{file_hash}"
             )
-
-        # Limit document text sent to the AI
-        document_text = text[:30000]
-
-        # Use filename and language for summary storage
-        summary_key = (
-            f"summary_{uploaded_file.name}_{language}"
-        )
 
         # Summary section
         st.subheader(labels["summary"])
@@ -159,10 +186,15 @@ if uploaded_file is not None:
                 labels["short"],
                 labels["detailed"],
                 labels["bullets"]
-            ]
+            ],
+            key=f"style_{file_hash}"
         )
 
-        if st.button(labels["generate"], type="primary"):
+        if st.button(
+            labels["generate"],
+            type="primary",
+            key=f"generate_{file_hash}"
+        ):
             if summary_style == labels["short"]:
                 style_instruction = (
                     "Write a concise summary in 5 to 7 sentences."
@@ -174,7 +206,7 @@ if uploaded_file is not None:
                 )
             else:
                 style_instruction = (
-                    "Summarize the document using clear "
+                    "Summarize the documents using clear "
                     "bullet points."
                 )
 
@@ -182,10 +214,13 @@ if uploaded_file is not None:
 You are a helpful document summarization assistant.
 Write the entire answer in {output_language}.
 {style_instruction}
-Use only information from the document.
-Do not invent facts. Preserve important names, dates, and numbers.
 
-DOCUMENT:
+Use only information from the supplied documents.
+Do not invent facts. Preserve important names, dates,
+and numbers. Clearly distinguish information from
+different documents when relevant.
+
+DOCUMENTS:
 {document_text}
 """
 
@@ -206,7 +241,7 @@ DOCUMENT:
                 st.error(labels["summary_error"])
                 st.code(f"{type(e).__name__}: {e}")
 
-        # Show and download summary
+        # Display and download summary
         if st.session_state.get(summary_key):
             st.markdown(st.session_state[summary_key])
 
@@ -214,15 +249,19 @@ DOCUMENT:
                 labels["download"],
                 data=st.session_state[summary_key],
                 file_name="document_summary.txt",
-                mime="text/plain"
+                mime="text/plain",
+                key=f"download_{file_hash}"
             )
 
         # Ask AI section
         st.divider()
         st.subheader("💬 Ask AI")
 
-        with st.form("question_form"):
-            question = st.text_input(labels["question"])
+        with st.form(f"question_form_{file_hash}"):
+            question = st.text_input(
+                labels["question"],
+                key=f"question_{file_hash}"
+            )
             ask_clicked = st.form_submit_button(labels["ask"])
 
         if ask_clicked:
@@ -230,13 +269,15 @@ DOCUMENT:
                 st.warning(labels["empty"])
             else:
                 question_prompt = f"""
-You answer questions about documents.
+You answer questions about the supplied documents.
 Answer entirely in {output_language}.
-Use the document as your source.
-If the answer is not in the document, say so clearly.
-Do not invent facts.
+Use only the documents as your source.
+If the answer is not present in the documents,
+say so clearly. Do not invent facts.
+If multiple documents are relevant, distinguish
+between their information.
 
-DOCUMENT:
+DOCUMENTS:
 {document_text}
 
 USER QUESTION:
@@ -254,11 +295,10 @@ USER QUESTION:
                     if response.text:
                         answer = response.text
 
-                        # Save question and answer to history
                         st.session_state.chat_history.append({
                             "question": question,
                             "answer": answer,
-                            "document": uploaded_file.name
+                            "document": ", ".join(document_names)
                         })
 
                         st.subheader(labels["answer"])
@@ -270,9 +310,8 @@ USER QUESTION:
                     st.error(labels["answer_error"])
                     st.code(f"{type(e).__name__}: {e}")
 
-    except Exception as e:
-        st.error(labels["read_error"])
-        st.code(f"{type(e).__name__}: {e}")
+    else:
+        st.warning(labels["no_text"])
 
 # Display chat history
 st.divider()
@@ -286,11 +325,11 @@ if st.session_state.chat_history:
         question_title = chat["question"][:80]
 
         with st.expander(f"Q{i}: {question_title}"):
-            st.caption(f"Document: {chat['document']}")
+            st.caption(f"Document(s): {chat['document']}")
             st.markdown("**Question:**")
             st.write(chat["question"])
             st.markdown("**Answer:**")
-            st.write(chat["answer"])
+            st.markdown(chat["answer"])
 
     if st.button(labels["clear"]):
         st.session_state.chat_history = []

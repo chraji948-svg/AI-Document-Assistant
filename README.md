@@ -46,3 +46,6 @@ streamlit run app.py
 ## 👨‍💻 Project Purpose
 
 This project demonstrates AI-powered document summarization and question answering using Python and Google Gemini.
+## 🌐 Live Demo
+
+[Open the AI Document Assistant](https://ai-document-assistant-er63y2yfsnesea6qt6kgza.streamlit.app/)

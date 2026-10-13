@@ -11,14 +11,17 @@ st.set_page_config(
 )
 
 st.title("📄 AI Document Assistant")
-st.write("Upload a PDF or TXT and ask questions about its content.")
+st.write(
+    "Upload a PDF or TXT document and ask AI questions about it."
+)
 
-# Read API key securely from Streamlit Secrets
+# Get API key securely from Streamlit Secrets
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-except (KeyError, FileNotFoundError):
-    api_key = None
+    api_key = st.secrets.get("GEMINI_API_KEY", "")
+except Exception:
+    api_key = ""
 
+# Upload PDF or TXT
 uploaded_file = st.file_uploader(
     "Upload your document",
     type=["pdf", "txt"]
@@ -32,26 +35,32 @@ if not api_key:
 
 elif uploaded_file is not None:
     try:
+        # Extract document text
         if uploaded_file.name.lower().endswith(".pdf"):
-            reader = PdfReader(BytesIO(uploaded_file.getvalue()))
+            reader = PdfReader(
+                BytesIO(uploaded_file.getvalue())
+            )
+
             text = "\n".join(
                 page.extract_text() or ""
                 for page in reader.pages
             )
         else:
             text = uploaded_file.getvalue().decode(
-                "utf-8", errors="replace"
+                "utf-8",
+                errors="replace"
             )
 
         if not text.strip():
             st.warning(
                 "No readable text found. "
-                "Scanned PDFs may need OCR."
+                "This PDF may be scanned or image-only."
             )
+
         else:
             st.success("Document uploaded successfully!")
 
-            with st.expander("Document Preview"):
+            with st.expander("📖 Document Preview"):
                 st.text_area(
                     "Extracted text",
                     text,
@@ -60,25 +69,35 @@ elif uploaded_file is not None:
 
             st.subheader("💬 Ask AI about your document")
 
-            question = st.text_input(
-                "Enter your question",
-                placeholder="What is this document about?"
-            )
+            # Keep the question and answer interaction
+            # together in a form.
+            with st.form("question_form"):
+                question = st.text_input(
+                    "Enter your question",
+                    placeholder="What is this document about?"
+                )
 
-            if st.button("Ask AI", type="primary"):
+                submitted = st.form_submit_button(
+                    "Ask AI",
+                    type="primary"
+                )
+
+            if submitted:
                 if not question.strip():
                     st.warning("Please enter a question.")
+
                 else:
-                    # Keep requests within a practical size limit.
-                    # This simple version sends the first 30,000
-                    # characters of the extracted document.
+                    # Send a limited amount of document text
                     document_text = text[:30000]
 
                     prompt = f"""
 You are an assistant that answers questions about documents.
-Use the document below to answer the user's question.
-If the answer is not in the document, say that clearly.
-Do not invent facts.
+
+Instructions:
+- Answer using the document provided below.
+- If the answer is not in the document, say so clearly.
+- Do not invent facts.
+- Give a clear and helpful answer.
 
 DOCUMENT:
 {document_text}
@@ -87,21 +106,36 @@ USER QUESTION:
 {question}
 """
 
-                    
                     try:
-                        with st.spinner("AI is reading your document..."):
-                            client = genai.Client(api_key=api_key)
+                        with st.spinner(
+                            "AI is reading your document..."
+                        ):
+                            client = genai.Client(
+                                api_key=api_key
+                            )
+
                             response = client.models.generate_content(
                                 model="gemini-2.5-flash",
                                 contents=prompt
                             )
 
                         if response.text:
-                            st.subheader("Answer")
-                            st.write(response.text)
+                            st.subheader("🤖 AI Answer")
+                            st.markdown(response.text)
                         else:
-                            st.warning("The AI returned an empty answer.")
+                            st.warning(
+                                "The AI returned an empty answer. "
+                                "Please try another question."
+                            )
 
                     except Exception as e:
                         st.error("AI request failed.")
-                        st.code(f"{type(e).__name__}: {e}")
+                        st.write(
+                            "Error type:",
+                            type(e).__name__
+                        )
+                        st.code(str(e))
+
+    except Exception as e:
+        st.error("Could not read the document.")
+        st.code(f"{type(e).__name__}: {e}")

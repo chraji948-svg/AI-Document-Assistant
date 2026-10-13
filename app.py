@@ -222,9 +222,9 @@ USER QUESTION:
                             answer = response.text
 
     # Save question and answer
-        st.session_state.chat_history.append({
-            "question": question,
-            "answer": answer
+            st.session_state.chat_history.append({
+                "question": question,
+                "answer": answer
     })
 
     st.subheader(labels["answer"])

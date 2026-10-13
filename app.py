@@ -54,10 +54,21 @@ if language == "తెలుగు":
         "ask": "AIని అడగండి",
         "answer": "🤖 AI సమాధానం",
         "empty": "దయచేసి ప్రశ్న టైప్ చేయండి.",
-        "no_text": "ఈ document‌లో చదవగల text కనిపించలేదు. Scanned PDF కావచ్చు.",
+        "no_text": (
+            "ఈ document‌లో చదవగల text కనిపించలేదు. "
+            "Scanned PDF కావచ్చు."
+        ),
         "working_summary": "Summary తయారవుతోంది...",
         "working_answer": "AI సమాధానం సిద్ధం చేస్తోంది...",
         "download": "Summary Download చేయండి",
+        "history": "📚 గత ప్రశ్నలు మరియు సమాధానాలు",
+        "clear": "Chat History తొలగించండి",
+        "no_history": "ఇంకా ప్రశ్నలు అడగలేదు.",
+        "empty_summary": "AI నుంచి Summary రాలేదు.",
+        "empty_answer": "AI నుంచి సమాధానం రాలేదు.",
+        "summary_error": "Summary తయారు చేయలేకపోయాం.",
+        "answer_error": "AI సమాధానం ఇవ్వలేకపోయింది.",
+        "read_error": "Document చదవలేకపోయాం."
     }
     output_language = "Telugu"
 else:
@@ -75,13 +86,25 @@ else:
         "ask": "Ask AI",
         "answer": "🤖 AI Answer",
         "empty": "Please enter a question.",
-        "no_text": "No readable text found. This may be a scanned PDF.",
+        "no_text": (
+            "No readable text found. "
+            "This may be a scanned PDF."
+        ),
         "working_summary": "Generating summary...",
         "working_answer": "Preparing AI answer...",
         "download": "Download Summary",
+        "history": "📚 Chat History",
+        "clear": "Clear Chat History",
+        "no_history": "No questions asked yet.",
+        "empty_summary": "The AI returned an empty summary.",
+        "empty_answer": "The AI returned an empty answer.",
+        "summary_error": "Could not generate summary.",
+        "answer_error": "AI request failed.",
+        "read_error": "Could not read the document."
     }
     output_language = "English"
 
+# Upload document
 uploaded_file = st.file_uploader(
     labels["upload"],
     type=["pdf", "txt"]
@@ -100,7 +123,8 @@ if uploaded_file is not None:
             )
         else:
             text = uploaded_file.getvalue().decode(
-                "utf-8", errors="replace"
+                "utf-8",
+                errors="replace"
             )
 
         if not text.strip():
@@ -109,6 +133,7 @@ if uploaded_file is not None:
 
         st.success(labels["success"])
 
+        # Document preview
         with st.expander(labels["preview"]):
             st.text_area(
                 "Extracted text",
@@ -116,13 +141,15 @@ if uploaded_file is not None:
                 height=250
             )
 
-        # Keep prompt size practical for this first version
+        # Limit document text sent to the AI
         document_text = text[:30000]
 
-        # Create a new summary when the document or language changes
-        summary_key = f"summary_{uploaded_file.name}_{language}"
-        answer_key = f"answer_{uploaded_file.name}_{language}"
+        # Use filename and language for summary storage
+        summary_key = (
+            f"summary_{uploaded_file.name}_{language}"
+        )
 
+        # Summary section
         st.subheader(labels["summary"])
 
         summary_style = st.selectbox(
@@ -141,11 +168,13 @@ if uploaded_file is not None:
                 )
             elif summary_style == labels["detailed"]:
                 style_instruction = (
-                    "Write a detailed summary with headings and key points."
+                    "Write a detailed summary with headings "
+                    "and key points."
                 )
             else:
                 style_instruction = (
-                    "Summarize the document using clear bullet points."
+                    "Summarize the document using clear "
+                    "bullet points."
                 )
 
             summary_prompt = f"""
@@ -170,12 +199,13 @@ DOCUMENT:
                 if response.text:
                     st.session_state[summary_key] = response.text
                 else:
-                    st.warning("The AI returned an empty summary.")
+                    st.warning(labels["empty_summary"])
 
             except Exception as e:
-                st.error("Could not generate summary.")
+                st.error(labels["summary_error"])
                 st.code(f"{type(e).__name__}: {e}")
 
+        # Show and download summary
         if st.session_state.get(summary_key):
             st.markdown(st.session_state[summary_key])
 
@@ -186,6 +216,7 @@ DOCUMENT:
                 mime="text/plain"
             )
 
+        # Ask AI section
         st.divider()
         st.subheader("💬 Ask AI")
 
@@ -218,42 +249,50 @@ USER QUESTION:
                             model="gemini-3.5-flash-lite",
                             contents=question_prompt
                         )
-                        if response.text:
-                            answer = response.text
 
-    # Save question and answer
-            st.session_state.chat_history.append({
-                "question": question,
-                "answer": answer
-    })
+                    if response.text:
+                        answer = response.text
 
-    st.subheader(labels["answer"])
-    st.markdown(answer)
-else:
-    st.warning("The AI returned an empty answer.")
+                        # Save question and answer to history
+                        st.session_state.chat_history.append({
+                            "question": question,
+                            "answer": answer,
+                            "document": uploaded_file.name
+                        })
+
+                        st.subheader(labels["answer"])
+                        st.markdown(answer)
+                    else:
+                        st.warning(labels["empty_answer"])
 
                 except Exception as e:
-                    st.error("AI request failed.")
+                    st.error(labels["answer_error"])
                     st.code(f"{type(e).__name__}: {e}")
 
     except Exception as e:
-        st.error("Could not read the document.")
+        st.error(labels["read_error"])
         st.code(f"{type(e).__name__}: {e}")
 
 # Display chat history
 st.divider()
-st.subheader("📚 Chat History")
+st.subheader(labels["history"])
 
 if st.session_state.chat_history:
     for i, chat in enumerate(
-        st.session_state.chat_history, start=1
+        reversed(st.session_state.chat_history),
+        start=1
     ):
-        with st.expander(f"Question {i}: {chat['question']}"):
+        question_title = chat["question"][:80]
+
+        with st.expander(f"Q{i}: {question_title}"):
+            st.caption(f"Document: {chat['document']}")
+            st.markdown("**Question:**")
+            st.write(chat["question"])
             st.markdown("**Answer:**")
             st.write(chat["answer"])
 
-    if st.button("Clear Chat History"):
+    if st.button(labels["clear"]):
         st.session_state.chat_history = []
         st.rerun()
 else:
-    st.info("మీరు ఇంకా ప్రశ్నలు అడగలేదు. / No questions asked yet.")
+    st.info(labels["no_history"])

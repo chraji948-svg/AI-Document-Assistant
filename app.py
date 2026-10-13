@@ -104,12 +104,10 @@ USER QUESTION:
                                 "Please try again."
                             )
 
-                    except Exception as e:
-                        st.error(
-                            "AI request failed. Check your API key, "
-                            "model access, quota, and connection."
-                        )
-                        st.caption(f"Technical details: {e}")
+                    
+except Exception as e:
+    st.error("AI request failed.")
+    st.code(f"{type(e).__name__}: {e}")
 
     except Exception as e:
         st.error(f"Could not read the document: {e}")

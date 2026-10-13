@@ -107,7 +107,7 @@ else:
 # Upload document
 uploaded_files = st.file_uploader(
     labels["upload"],
-    type=["pdf", "txt"]
+    type=["pdf", "txt"],
     accept_multiple_files=True
 )
 

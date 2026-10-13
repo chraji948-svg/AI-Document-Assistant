@@ -105,9 +105,10 @@ else:
     output_language = "English"
 
 # Upload document
-uploaded_file = st.file_uploader(
+uploaded_files = st.file_uploader(
     labels["upload"],
     type=["pdf", "txt"]
+    accept_multiple_files=True
 )
 
 if uploaded_file is not None:

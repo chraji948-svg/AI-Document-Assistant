@@ -103,11 +103,9 @@ USER QUESTION:
                                 "The AI returned an empty answer. "
                                 "Please try again."
                             )
-
-                    
-except Exception as e:
-    st.error("AI request failed.")
-    st.code(f"{type(e).__name__}: {e}")
+                            except Exception as e:
+                                st.error("AI request failed.")
+                                st.code(f"{type(e).__name__}: {e}")
 
     except Exception as e:
         st.error(f"Could not read the document: {e}")
